@@ -32,8 +32,7 @@ CPMAddPackage(
 
 CPMAddPackage(
     NAME assimp
-    GITHUB_REPOSITORY assimp/assimp
-    GIT_TAG v5.2.4
+    URL https://github.com/assimp/assimp/archive/refs/heads/master.zip
     OPTIONS
         "BUILD_SHARED_LIBS OFF"
         "ASSIMP_BUILD_ASSIMP_TOOLS OFF"
