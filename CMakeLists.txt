@@ -37,6 +37,7 @@ CPMAddPackage(
         "BUILD_SHARED_LIBS OFF"
         "ASSIMP_BUILD_ASSIMP_TOOLS OFF"
         "ASSIMP_BUILD_TESTS OFF"
+        "ASSIMP_BUILD_MINIZIP OFF"
         "ASSIMP_INJECT_DEBUG_POSTFIX OFF"
 )
 
@@ -45,7 +46,7 @@ find_package(Qt6 COMPONENTS WebSockets Core Gui)
 if (NOT Qt6_FOUND)
     find_package(Qt5 COMPONENTS Gui Widgets Core Websockets)
 endif()
-
+LINK_DIRECTORIES(/usr/local/lib)
 # Options ======================================================================
 
 set(SANITIZER "none" CACHE STRING "Build with a given sanitizer")
