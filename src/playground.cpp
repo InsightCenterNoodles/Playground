@@ -249,7 +249,7 @@ struct Importer {
 
         source.index_format = noo::Format::U32;
 
-        source.indicies = std::as_writable_bytes(std::span(indicies));
+        source.indices = std::as_writable_bytes(std::span(indicies));
 
         auto const& material = *scene.mMaterials[mesh.mMaterialIndex];
 
