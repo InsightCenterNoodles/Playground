@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include <QColor>
+#include <QCommandLineParser>
 #include <QDebug>
 #include <QFileInfo>
 #include <QVariantAnimation>
@@ -434,15 +435,18 @@ void Playground::update_root_tf() {
     noo::update_object(m_collective_root, ob);
 }
 
-Playground::Playground(uint16_t port, QStringList args) {
+Playground::Playground() {
 
-    noo::ServerOptions options {
-        .port = port,
-    };
+    QCommandLineParser parser;
+    parser.setApplicationDescription("Geometry export tool for NOODLES");
+    parser.addHelpOption();
+    parser.addVersionOption();
 
-    m_server = noo::create_server(options);
+    parser.addPositionalArgument("files", "Geometry files to import");
 
-    qInfo() << "Creating server, listening on port" << port;
+    m_server = noo::create_server(parser);
+
+    auto args = parser.positionalArguments();
 
     Q_ASSERT(m_server);
 

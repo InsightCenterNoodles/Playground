@@ -57,7 +57,7 @@ class Playground : public QObject {
     void update_root_tf();
 
 public:
-    Playground(uint16_t port, QStringList args);
+    Playground();
 
     ~Playground();
 

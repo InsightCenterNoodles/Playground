@@ -27,7 +27,16 @@ CPMAddPackage(
 CPMAddPackage(
     NAME noodles
     GITHUB_REPOSITORY InsightCenterNoodles/NoodlesPlusPlus
-    GIT_TAG 32260de82ce3855e4ab979513b5afee6739b7fd8
+    GIT_TAG cd0680bcc90112bb9323c8cc04fc21736be58f44
+)
+
+CPMAddPackage(
+    NAME quazip
+    GITHUB_REPOSITORY stachenov/quazip
+    GIT_TAG 403fbcb56626551fe911af0c3a5ee2b5122df664
+    OPTIONS
+        "BUILD_SHARED_LIBS OFF"
+        "QUAZIP_USE_QT_LIB ON"
 )
 
 CPMAddPackage(
@@ -64,7 +73,7 @@ target_link_options(Playground PUBLIC ${sanitizer_compile_flag})
 
 target_link_libraries(Playground PRIVATE glm)
 
-target_link_libraries(Playground PRIVATE noodles)
+target_link_libraries(Playground PRIVATE noodles quazip)
 
 target_link_libraries(Playground PRIVATE assimp)
 
