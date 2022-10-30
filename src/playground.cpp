@@ -1,5 +1,7 @@
 #include "playground.h"
 
+#include "xdmfimporter.h"
+
 #include "variant_tools.h"
 
 #include <glm/gtx/quaternion.hpp>
@@ -336,15 +338,39 @@ struct Importer {
 };
 
 
-std::variant<std::shared_ptr<Model>, QString>
-make_thing(int                  id,
-           QString              path,
-           noo::DocumentTPtrRef doc,
-           noo::ObjectTPtr      collective_root) {
-    if (!QFileInfo::exists(path)) return "File does not exist.";
+std::variant<ModelPtr, QString> import_ai_scene(aiScene const&       scene,
+                                                noo::DocumentTPtrRef doc,
+                                                noo::ObjectTPtr collective_root,
+                                                int             id) {
+    auto new_model = std::make_shared<Model>();
+    new_model->id  = id;
+
+    Importer imp {
+        .scene     = scene,
+        .doc       = doc,
+        .root      = collective_root,
+        .model_ref = new_model,
+        .thing     = *new_model,
+    };
+
+    imp.process_import_tree(*(scene.mRootNode), collective_root);
+
+    return new_model;
+}
+
+
+std::variant<ModelPtr, QString> make_thing(int                  id,
+                                           QString              path,
+                                           noo::DocumentTPtrRef doc,
+                                           noo::ObjectTPtr collective_root) {
+
+    QFileInfo info(path);
+
+    if (!info.exists(path)) return "File does not exist.";
 
     Assimp::Importer importer;
 
+    importer.RegisterLoader(new XDMFAssimpImporter);
 
     auto path_str = path.toStdString();
 
@@ -360,20 +386,7 @@ make_thing(int                  id,
     }
 
 
-    auto new_model = std::make_shared<Model>();
-    new_model->id  = id;
-
-    Importer imp {
-        .scene     = *scene,
-        .doc       = doc,
-        .root      = collective_root,
-        .model_ref = new_model,
-        .thing     = *new_model,
-    };
-
-    imp.process_import_tree(*(scene->mRootNode), collective_root);
-
-    return new_model;
+    return import_ai_scene(*scene, doc, collective_root, id);
 }
 
 // =============================================================================
@@ -389,7 +402,14 @@ void Playground::add_model(QString path) {
         return;
     }
 
-    m_thing_list[m_id_counter] = *std::get_if<std::shared_ptr<Model>>(&result);
+    auto ptr = std::get<std::shared_ptr<Model>>(result);
+
+    if (!ptr) {
+        qWarning() << "Unable to import, skipping";
+        return;
+    }
+
+    m_thing_list[m_id_counter] = ptr;
 
     m_id_counter++;
 
@@ -477,7 +497,7 @@ Playground::Playground() {
 
         noo::ObjectData nd;
 
-        nd.transform = glm::lookAt(p, glm::vec3 { -1 }, glm::vec3 { 0, 1, 0 });
+        nd.transform = glm::lookAt(p, glm::vec3 { 0 }, glm::vec3 { 0, 1, 0 });
 
         nd.lights.emplace().push_back(light);
 
@@ -486,7 +506,9 @@ Playground::Playground() {
         m_lights.emplace_back(noo::create_object(m_doc, nd));
     };
 
-    add_light({ 0, 0, 0 }, Qt::white, 2);
+    add_light({ 1, 1, 1 }, Qt::white, 4);
+
+    add_light({ 1, 0, 0 }, Qt::white, 4);
 
     {
         noo::ObjectData obdata = {

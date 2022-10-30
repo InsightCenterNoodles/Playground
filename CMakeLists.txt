@@ -41,10 +41,10 @@ CPMAddPackage(
         "ASSIMP_INJECT_DEBUG_POSTFIX OFF"
 )
 
-find_package(Qt6 COMPONENTS WebSockets Core Gui)
+find_package(Qt6 COMPONENTS Gui Widgets Core Websockets Xml)
 
 if (NOT Qt6_FOUND)
-    find_package(Qt5 COMPONENTS Gui Widgets Core Websockets)
+    find_package(Qt5 COMPONENTS Gui Widgets Core Websockets Xml)
 endif()
 LINK_DIRECTORIES(/usr/local/lib)
 # Options ======================================================================
@@ -70,7 +70,7 @@ target_link_libraries(Playground PRIVATE noodles)
 target_link_libraries(Playground PRIVATE assimp)
 
 target_link_libraries(Playground PUBLIC
-    Qt::Core Qt::WebSockets Qt::Gui
+    Qt::Core Qt::WebSockets Qt::Gui Qt::Xml
 )
 
 add_subdirectory(src)

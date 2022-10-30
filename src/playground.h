@@ -37,6 +37,9 @@ struct Model {
     std::vector<noo::ObjectTPtr> other_objects;
 };
 
+using ModelPtr = std::shared_ptr<Model>;
+
+
 class Playground : public QObject {
     Q_OBJECT
 

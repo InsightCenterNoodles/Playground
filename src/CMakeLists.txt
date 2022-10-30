@@ -6,4 +6,6 @@ PRIVATE
     utility.cpp
     utility.h
     variant_tools.h
+    xdmfimporter.cpp
+    xdmfimporter.h
 )
