@@ -413,7 +413,7 @@ void Playground::add_model(QString path) {
 
     m_id_counter++;
 
-    qInfo() << "Done.";
+    qInfo() << "Done adding model.";
 }
 
 void Playground::update_root_tf() {
@@ -501,7 +501,7 @@ Playground::Playground() {
 
         nd.lights.emplace().push_back(light);
 
-        nd.tags.emplace().emplace_back(noo::names::tag_user_hidden);
+        nd.tags.emplace().push_back(noo::names::tag_user_hidden);
 
         m_lights.emplace_back(noo::create_object(m_doc, nd));
     };
@@ -509,6 +509,8 @@ Playground::Playground() {
     add_light({ 1, 1, 1 }, Qt::white, 4);
 
     add_light({ 1, 0, 0 }, Qt::white, 4);
+
+    auto start_time = std::chrono::high_resolution_clock::now();
 
     {
         noo::ObjectData obdata = {
@@ -523,7 +525,11 @@ Playground::Playground() {
         add_model(fname);
     }
 
-    qDebug() << "Done loading models";
+    auto end_time = std::chrono::high_resolution_clock::now();
+
+    qInfo() << "Done loading models:"
+            << std::chrono::duration<double>(end_time - start_time).count()
+            << "seconds";
 
     update_root_tf();
 }
