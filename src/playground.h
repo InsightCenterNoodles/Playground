@@ -23,9 +23,9 @@ public:
 struct Model {
     int id;
 
-    glm::vec3 position;
-    glm::quat rotation;
-    glm::vec3 scale;
+    glm::vec3 position = glm::vec3(0);
+    glm::quat rotation = glm::quat();
+    glm::vec3 scale    = glm::vec3(1);
 
     glm::vec3 min_bb = glm::vec3(std::numeric_limits<float>::max());
     glm::vec3 max_bb = glm::vec3(std::numeric_limits<float>::lowest());

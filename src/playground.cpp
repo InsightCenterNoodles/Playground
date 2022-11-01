@@ -73,18 +73,21 @@ ModelCallbacks::ModelCallbacks(noo::ObjectT* t, std::shared_ptr<Model> s)
     : noo::EntityCallbacks(t, normal_callbacks), m_model(s) { }
 
 void ModelCallbacks::set_position(glm::vec3 p) {
+    qDebug() << Q_FUNC_INFO << p.x << p.y << p.z;
     if (auto sp = m_model.lock()) {
         sp->position = p;
         update_transform();
     }
 }
 void ModelCallbacks::set_rotation(glm::quat q) {
+    qDebug() << Q_FUNC_INFO << q.x << q.y << q.z << q.w;
     if (auto sp = m_model.lock()) {
         sp->rotation = q;
         update_transform();
     }
 }
 void ModelCallbacks::set_scale(glm::vec3 s) {
+    qDebug() << Q_FUNC_INFO << s.x << s.y << s.z;
     if (auto sp = m_model.lock()) {
         sp->scale = s;
         update_transform();
@@ -98,6 +101,12 @@ glm::mat4 Model::recompute_transform() {
     ret = glm::translate(ret, position);
     ret = ret * glm::mat4_cast(rotation);
     ret = glm::scale(ret, scale);
+
+    qCritical() << ret[0].x << ret[0].y << ret[0].z << ret[0].w;
+    qCritical() << ret[1].x << ret[1].y << ret[1].z << ret[1].w;
+    qCritical() << ret[2].x << ret[2].y << ret[2].z << ret[2].w;
+    qCritical() << ret[3].x << ret[3].y << ret[3].z << ret[3].w;
+
     return ret;
 }
 
