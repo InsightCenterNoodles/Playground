@@ -41,10 +41,10 @@ CPMAddPackage(
         "ASSIMP_INJECT_DEBUG_POSTFIX OFF"
 )
 
-find_package(Qt6 COMPONENTS Gui Widgets Core Websockets Xml)
+find_package(Qt6 COMPONENTS Gui Widgets Core WebSockets Xml)
 
 if (NOT Qt6_FOUND)
-    find_package(Qt5 COMPONENTS Gui Widgets Core Websockets Xml)
+    find_package(Qt5 COMPONENTS Gui Widgets Core WebSockets Xml)
 endif()
 LINK_DIRECTORIES(/usr/local/lib)
 # Options ======================================================================
