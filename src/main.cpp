@@ -9,7 +9,7 @@ int main(int argc, char* argv[]) {
     auto app = QCoreApplication(argc, argv);
 
     QCoreApplication::setApplicationName("Playground");
-    QCoreApplication::setApplicationVersion("0.1");
+    QCoreApplication::setApplicationVersion("0.2");
 
     Playground playground;
 

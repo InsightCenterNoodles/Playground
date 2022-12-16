@@ -4,6 +4,11 @@
 
 #include <memory>
 
+struct ImportOptions {
+    bool force_samplers_to_nearest = false;
+    bool double_sided              = false;
+};
+
 struct Model;
 
 class ModelCallbacks : public noo::EntityCallbacks {
@@ -55,7 +60,7 @@ class Playground : public QObject {
     int                                m_id_counter = 0;
     QHash<int, std::shared_ptr<Model>> m_thing_list;
 
-    void add_model(QString);
+    void add_model(QString, ImportOptions const&);
 
     void update_root_tf();
 

@@ -9,10 +9,17 @@
 #include <string>
 #include <string_view>
 
+#include <QBuffer>
+#include <QByteArray>
 #include <QColor>
 #include <QCommandLineParser>
 #include <QDebug>
 #include <QFileInfo>
+#include <QImageWriter>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QMimeDatabase>
 #include <QVariantAnimation>
 
 #include <assimp/Importer.hpp>
@@ -50,6 +57,7 @@ QDebug operator<<(QDebug debug, glm::mat4 const& c) {
 
     return debug;
 }
+
 
 // =============================================================================
 
@@ -128,13 +136,140 @@ struct Importer {
     noo::ObjectTPtr        root;
     std::shared_ptr<Model> model_ref;
     Model&                 thing;
+    ImportOptions          options;
 
     std::unordered_map<unsigned, noo::MeshTPtr> converted_meshes;
+    QHash<QString, noo::TextureTPtr>            converted_textures;
+
+    noo::TextureTPtr find_texture_type(aiMaterial const&          m,
+                                       std::vector<aiTextureType> types) {
+        for (auto type : types) {
+            if (m.GetTextureCount(type) < 1) continue;
+
+            aiString path;
+            m.GetTexture(type, 0, &path);
+
+            qDebug() << "Texture path at" << path.C_Str();
+
+            return import_texture(QString::fromUtf8(path.C_Str(), path.length));
+        }
+
+        return {};
+    }
+
+    noo::TextureTPtr import_texture(aiTexture const& tex) {
+        qDebug() << "TEX" << tex.achFormatHint << tex.mWidth << tex.mHeight
+                 << tex.mFilename.C_Str();
+
+        if (tex.mHeight == 0) {
+            qDebug() << "Texture is compressed";
+
+            return import_texture(QByteArray((char*)tex.pcData, tex.mWidth),
+                                  "");
+        }
+
+        qCritical() << "Image conversion is not yet supported";
+
+        return nullptr;
+    }
+
+    noo::TextureTPtr import_texture(QString path) {
+        if (converted_textures.contains(path)) return converted_textures[path];
+
+        qDebug() << "Loading texture from path:" << path;
+
+        if (path.startsWith("*")) {
+            qDebug() << "Appears to be path to builtin";
+            bool ok;
+            int  index = path.mid(1).toInt(&ok);
+            if (!ok or index >= scene.mNumTextures) {
+                qDebug() << "Apparently not. Bailing.";
+                return {};
+            }
+
+            auto ret                 = import_texture(*scene.mTextures[index]);
+            converted_textures[path] = ret;
+            return ret;
+        }
+
+        qDebug() << "Path is external, loading";
+
+        QMimeDatabase db;
+        auto          type = db.mimeTypeForFile(path);
+
+        if (type.inherits("image/png") or type.inherits("image/jpeg")) {
+            // just use as is
+            QFile file(path);
+            file.open(QFile::ReadOnly);
+
+            auto ret                 = import_texture(file.readAll(), path);
+            converted_textures[path] = ret;
+            return ret;
+        }
+
+        QByteArray bytes;
+        {
+            QBuffer      out_stream(&bytes);
+            QImageWriter writer(&out_stream, "png");
+            QImage       img(path);
+            writer.write(img);
+        }
+
+        auto ret                 = import_texture(bytes, path);
+        converted_textures[path] = ret;
+        return ret;
+    }
+
+    noo::TextureTPtr import_texture(QByteArray const& array, QString name) {
+        qDebug() << "Loading raw texture" << array.size() << "bytes";
+
+        auto new_buffer = noo::create_buffer(
+            doc,
+            noo::BufferData { .name   = "Buffer for" + name,
+                              .source = noo::BufferInlineSource {
+                                  .data = array,
+                              } });
+
+        auto new_buffer_view =
+            noo::create_buffer_view(doc,
+                                    noo::BufferViewData {
+                                        .source_buffer = new_buffer,
+                                        .type   = noo::ViewType::IMAGE_INFO,
+                                        .offset = 0,
+                                        .length = (uint64_t)array.length(),
+                                    });
+
+        auto new_image = noo::create_image(doc,
+                                           noo::ImageData {
+                                               .name   = name,
+                                               .source = new_buffer_view,
+                                           });
+
+        auto tex_data = noo::TextureData { .name = name, .image = new_image };
+
+        if (options.force_samplers_to_nearest) {
+            qDebug() << "Adding sampler hack";
+            noo::SamplerData sampler_data {
+                .mag_filter = noo::MagFilter::NEAREST,
+                .min_filter = noo::MinFilter::NEAREST,
+                .wrap_s     = noo::SamplerMode::CLAMP_TO_EDGE,
+                .wrap_t     = noo::SamplerMode::CLAMP_TO_EDGE,
+            };
+
+            tex_data.sampler = noo::create_sampler(doc, sampler_data);
+        }
+
+        auto new_texture = noo::create_texture(doc, tex_data);
+
+        return new_texture;
+    }
 
     noo::MaterialTPtr import_material(aiMaterial const& m) {
         qDebug() << "Adding new material";
 
         noo::MaterialData mdata;
+
+        auto& pbr = mdata.pbr_info.emplace();
 
         {
             auto base_color = GET_MATKEY(m, AI_MATKEY_BASE_COLOR, aiColor4D);
@@ -143,7 +278,7 @@ struct Importer {
             }
             if (!base_color) { base_color = aiColor4D(1, 1, 1, 1); }
 
-            mdata.pbr_info.base_color = convert_qcol(base_color.value());
+            pbr.base_color = convert_qcol(base_color.value());
         }
 
         {
@@ -152,7 +287,7 @@ struct Importer {
                 metallic = GET_MATKEY(m, AI_MATKEY_SPECULAR_FACTOR, float);
             }
 
-            mdata.pbr_info.metallic = metallic.value_or(1);
+            pbr.metallic = metallic.value_or(1);
         }
 
         {
@@ -161,10 +296,25 @@ struct Importer {
                 roughness = GET_MATKEY(m, AI_MATKEY_GLOSSINESS_FACTOR, float);
             }
 
-            mdata.pbr_info.roughness = roughness.value_or(1);
+            pbr.roughness = roughness.value_or(1);
         }
 
         mdata.double_sided = GET_MATKEY(m, AI_MATKEY_TWOSIDED, bool);
+
+        if (options.double_sided) { mdata.double_sided = true; }
+
+        {
+            auto base = find_texture_type(
+                m, { aiTextureType_BASE_COLOR, aiTextureType_DIFFUSE });
+
+            if (base) {
+                mdata.pbr_info->base_color_texture.emplace(noo::TextureRef {
+                    .source             = base,
+                    .transform          = glm::mat3(1),
+                    .texture_coord_slot = 0,
+                });
+            }
+        }
 
         return noo::create_material(doc, mdata);
     }
@@ -350,7 +500,8 @@ struct Importer {
 std::variant<ModelPtr, QString> import_ai_scene(aiScene const&       scene,
                                                 noo::DocumentTPtrRef doc,
                                                 noo::ObjectTPtr collective_root,
-                                                int             id) {
+                                                int             id,
+                                                ImportOptions const& options) {
     auto new_model = std::make_shared<Model>();
     new_model->id  = id;
 
@@ -360,6 +511,7 @@ std::variant<ModelPtr, QString> import_ai_scene(aiScene const&       scene,
         .root      = collective_root,
         .model_ref = new_model,
         .thing     = *new_model,
+        .options   = options,
     };
 
     imp.process_import_tree(*(scene.mRootNode), collective_root);
@@ -367,11 +519,63 @@ std::variant<ModelPtr, QString> import_ai_scene(aiScene const&       scene,
     return new_model;
 }
 
+bool needs_gltf_sampler_hack(QString path) {
+    auto check_json = [](QByteArray array) {
+        auto doc = QJsonDocument::fromJson(array).object();
+
+        auto samplers = doc["samplers"].toArray();
+
+        for (auto const& sampler : samplers) {
+            auto so = sampler.toObject();
+            // check for nearest in any filter slot
+            if (so["magFilter"].toInt() == 9728) return true;
+            if (so["minFilter"].toInt() == 9728) return true;
+        }
+
+        return false;
+    };
+
+    qDebug() << Q_FUNC_INFO << path;
+    // THIS IS HORRIBLE AND ONLY HERE TO FIX THE FACT THAT ASSIMP HAS NO SAMPLER
+    // CONCEPT.
+
+    if (!path.endsWith(".glb") and !path.endsWith(".gltf")) return false;
+
+    // hacks for GLTF
+    QFile file(path);
+    if (!file.open(QFile::ReadOnly)) return false;
+
+    std::array<uint32_t, 5> header_first_chunk;
+    file.read((char*)header_first_chunk.data(), sizeof(header_first_chunk));
+
+    // check if its really a binary gltf
+    if (header_first_chunk[0] != 0x46546C67) {
+        // assume just json
+
+        file.seek(0);
+
+        return check_json(file.readAll());
+    }
+
+
+    // first chunk has to be json
+
+    auto chunk_len  = header_first_chunk[3];
+    auto chunk_type = header_first_chunk[4];
+
+    if (chunk_type != 0x4E4F534A) return false;
+
+    auto json_payload = file.read(chunk_len);
+
+    return check_json(json_payload);
+}
+
 
 std::variant<ModelPtr, QString> make_thing(int                  id,
                                            QString              path,
                                            noo::DocumentTPtrRef doc,
-                                           noo::ObjectTPtr collective_root) {
+                                           noo::ObjectTPtr      collective_root,
+                                           ImportOptions        options) {
 
     QFileInfo info(path);
 
@@ -394,15 +598,22 @@ std::variant<ModelPtr, QString> make_thing(int                  id,
         return QString("Unable to import file: ") + importer.GetErrorString();
     }
 
+    options.force_samplers_to_nearest = needs_gltf_sampler_hack(path);
 
-    return import_ai_scene(*scene, doc, collective_root, id);
+    if (options.force_samplers_to_nearest) {
+        qDebug() << "Enabling sampler hack";
+    }
+
+
+    return import_ai_scene(*scene, doc, collective_root, id, options);
 }
 
 // =============================================================================
 
-void Playground::add_model(QString path) {
+void Playground::add_model(QString path, ImportOptions const& options) {
     qInfo() << "Loading" << path;
-    auto result = make_thing(m_id_counter, path, m_doc, m_collective_root);
+    auto result =
+        make_thing(m_id_counter, path, m_doc, m_collective_root, options);
 
     auto err = std::get_if<QString>(&result);
 
@@ -473,6 +684,12 @@ Playground::Playground() {
 
     parser.addPositionalArgument("files", "Geometry files to import");
 
+    auto double_sided = QCommandLineOption(
+        "double-sided",
+        "Force all geometry to be double-sided (no backface culling)");
+
+    parser.addOption(double_sided);
+
     m_server = noo::create_server(parser);
 
     auto args = parser.positionalArguments();
@@ -519,6 +736,10 @@ Playground::Playground() {
 
     add_light({ 1, 0, 0 }, Qt::white, 4);
 
+    ImportOptions options {
+        .double_sided = parser.isSet(double_sided),
+    };
+
     auto start_time = std::chrono::high_resolution_clock::now();
 
     {
@@ -531,7 +752,7 @@ Playground::Playground() {
     }
 
     for (auto const& fname : args) {
-        add_model(fname);
+        add_model(fname, options);
     }
 
     auto end_time = std::chrono::high_resolution_clock::now();
